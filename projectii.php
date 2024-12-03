@@ -199,252 +199,145 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 }
 
-// Generate CV content based on template
-function generateCVContent($conn, $user_id) {
-    $sql = "SELECT template_choice, color_scheme FROM users WHERE id = $user_id";
-    $result = mysqli_query($conn, $sql);
-    $style_info = mysqli_fetch_assoc($result);
-    
-    $template = $style_info['template_choice'];
-    $color_scheme = $style_info['color_scheme'];
-    
-    // Get template-specific styling
-    $styles = getTemplateStyles($template, $color_scheme);
-    
-    [$user, $education, $experience, $skills, $projects, $certifications, $languages] = fetchUserData($conn, $user_id);
-
-    $cv = "<div style='{$styles['container']}'>";
-    
-    // Header section with profile image
-    if (!empty($user['profile_image'])) {
-        $cv .= "<div style='{$styles['header']}'>";
-        $cv .= "<img src='{$user['profile_image']}' style='width: 150px; border-radius: 50%;' alt='Profile Photo'>";
-    }
-    
-    $cv .= "<h1 style='{$styles['name']}'>{$user['name']}</h1>";
-    $cv .= "<div style='{$styles['contact']}'>";
-    $cv .= "<p><strong>Email:</strong> {$user['email']}<br>";
-    $cv .= "<strong>Phone:</strong> {$user['phone']}<br>";
-    $cv .= "<strong>Address:</strong> {$user['address']}</p></div>";
-    
-    // Professional Summary
-    $cv .= "<div style='{$styles['section']}'>";
-    $cv .= "<h2 style='{$styles['heading']}'>Professional Summary</h2>";
-    $cv .= "<p>{$user['summary']}</p></div>";
-
-    // Education
-    $cv .= "<div style='{$styles['section']}'>";
-    $cv .= "<h2 style='{$styles['heading']}'>Education</h2><ul style='{$styles['list']}'>";
-    while ($edu = mysqli_fetch_assoc($education)) {
-        $cv .= "<li style='{$styles['listItem']}'>";
-        $cv .= "<strong>{$edu['degree']} in {$edu['field']}</strong><br>";
-        $cv .= "{$edu['institution']}<br>";
-        $cv .= "{$edu['start_date']} to {$edu['end_date']}";
-        if (!empty($edu['gpa'])) {
-            $cv .= "<br>GPA: {$edu['gpa']}";
-        }
-        if (!empty($edu['achievements'])) {
-            $cv .= "<br>Achievements: {$edu['achievements']}";
-        }
-        $cv .= "</li>";
-    }
-    $cv .= "</ul></div>";
-
-    // Experience
-    $cv .= "<div style='{$styles['section']}'>";
-    $cv .= "<h2 style='{$styles['heading']}'>Work Experience</h2><ul style='{$styles['list']}'>";
-    while ($exp = mysqli_fetch_assoc($experience)) {
-        $cv .= "<li style='{$styles['listItem']}'>";
-        $cv .= "<strong>{$exp['position']} at {$exp['company']}</strong><br>";
-        $cv .= "{$exp['location']}<br>";
-        $cv .= "{$exp['start_date']} to {$exp['end_date']}<br>";
-        $cv .= "{$exp['description']}";
-        if (!empty($exp['achievements'])) {
-            $cv .= "<br>Key Achievements: {$exp['achievements']}";
-        }
-        $cv .= "</li>";
-    }
-    $cv .= "</ul></div>";
-
-    // Projects
-    if (mysqli_num_rows($projects) > 0) {
-        $cv .= "<div style='{$styles['section']}'>";
-        $cv .= "<h2 style='{$styles['heading']}'>Projects</h2><ul style='{$styles['list']}'>";
-        while ($project = mysqli_fetch_assoc($projects)) {
-            $cv .= "<li style='{$styles['listItem']}'>";
-            $cv .= "<strong>{$project['title']}</strong><br>";
-            $cv .= "{$project['description']}<br>";
-            $cv .= "Technologies: {$project['technologies']}<br>";
-            if (!empty($project['url'])) {
-                $cv .= "URL: <a href='{$project['url']}'>{$project['url']}</a><br>";
-            }
-            $cv .= "{$project['start_date']} to {$project['end_date']}";
-            $cv .= "</li>";
-        }
-        $cv .= "</ul></div>";
-    }
-
-    // Skills with categories
-    $cv .= "<div style='{$styles['section']}'>";
-    $cv .= "<h2 style='{$styles['heading']}'>Skills</h2>";
-    $categories = [];
-    while ($skill = mysqli_fetch_assoc($skills)) {
-        $category = $skill['category'] ?? 'Other';
-        if (!isset($categories[$category])) {
-            $categories[$category] = [];
-        }
-        $categories[$category][] = $skill;
-    }
-    
-    foreach ($categories as $category => $categorySkills) {
-        $cv .= "<h3 style='{$styles['subheading']}'>{$category}</h3><ul style='{$styles['list']}'>";
-        foreach ($categorySkills as $skill) {
-            $cv .= "<li style='{$styles['listItem']}'>";
-            $cv .= "<strong>{$skill['skill_name']}</strong> - {$skill['proficiency']}";
-            if (!empty($skill['years_experience'])) {
-                $cv .= " ({$skill['years_experience']} years)";
-            }
-            $cv .= "</li>";
-        }
-        $cv .= "</ul>";
-    }
-    $cv .= "</div>";
-
-    // Certifications
-    if (mysqli_num_rows($certifications) > 0) {
-        $cv .= "<div style='{$styles['section']}'>";
-        $cv .= "<h2 style='{$styles['heading']}'>Certifications</h2><ul style='{$styles['list']}'>";
-        while ($cert = mysqli_fetch_assoc($certifications)) {
-            $cv .= "<li style='{$styles['listItem']}'>";
-            $cv .= "<strong>{$cert['title']}</strong> - {$cert['issuer']}<br>";
-            $cv .= "Obtained: {$cert['date_obtained']}";
-            if (!empty($cert['expiry_date'])) {
-                $cv .= " (Expires: {$cert['expiry_date']})";
-            }
-            if (!empty($cert['credential_id'])) {
-                $cv .= "<br>Credential ID: {$cert['credential_id']}";
-            }
-            if (!empty($cert['url'])) {
-                $cv .= "<br>Verify at: <a href='{$cert['url']}'>{$cert['url']}</a>";
-            }
-            $cv .= "</li>";
-        }
-        $cv .= "</ul></div>";
-    }
-
-    // Languages
-    if (mysqli_num_rows($languages) > 0) {
-        $cv .= "<div style='{$styles['section']}'>";
-        $cv .= "<h2 style='{$styles['heading']}'>Languages</h2><ul style='{$styles['list']}'>";
-        while ($lang = mysqli_fetch_assoc($languages)) {
-            $cv .= "<li style='{$styles['listItem']}'>";
-            $cv .= "<li style='{$styles['listItem']}'>";
-$cv .= "<strong>{$lang['language_name']}</strong> - {$lang['proficiency_level']}";
-$cv .= "</li>";
-        }
-        $cv .= "</ul></div>";
-    }
-
-    $cv .= "</div>";
-    return $cv;
-}
-
-// Function to fetch all user data
-function fetchUserData($conn, $user_id) {
-    $user = mysqli_fetch_assoc(mysqli_query($conn, "SELECT * FROM users WHERE id = $user_id"));
-    
-    $education = mysqli_query($conn, "SELECT * FROM education WHERE user_id = $user_id ORDER BY end_date DESC");
-    $experience = mysqli_query($conn, "SELECT * FROM experience WHERE user_id = $user_id ORDER BY end_date DESC");
-    $skills = mysqli_query($conn, "SELECT * FROM skills WHERE user_id = $user_id ORDER BY category, skill_name");
-    $projects = mysqli_query($conn, "SELECT * FROM projects WHERE user_id = $user_id ORDER BY end_date DESC");
-    $certifications = mysqli_query($conn, "SELECT * FROM certifications WHERE user_id = $user_id ORDER BY date_obtained DESC");
-    $languages = mysqli_query($conn, "SELECT * FROM languages WHERE user_id = $user_id ORDER BY language_name");
-    
-    return [$user, $education, $experience, $skills, $projects, $certifications, $languages];
-}
-
-// Function to get template-specific styles
+// Define the getTemplateStyles function
 function getTemplateStyles($template, $color_scheme) {
-    $colors = [
-        'blue' => ['primary' => '#2c3e50', 'secondary' => '#3498db', 'text' => '#2c3e50'],
-        'green' => ['primary' => '#27ae60', 'secondary' => '#2ecc71', 'text' => '#2c3e50'],
-        'red' => ['primary' => '#c0392b', 'secondary' => '#e74c3c', 'text' => '#2c3e50']
+    // Define basic styles
+    $styles = [
+        'container' => 'font-family: Arial, sans-serif; line-height: 1.6;',
+        'header' => 'text-align: center; margin-bottom: 20px;',
+        'name' => 'font-size: 36px; font-weight: bold;',
+        'contact' => 'font-size: 16px; color: #555;',
+        'section' => 'margin-bottom: 20px;',
+        'heading' => 'font-size: 24px; font-weight: bold; margin-bottom: 10px;',
+        'subheading' => 'font-size: 20px; font-weight: bold; margin-top: 10px;',
+        'list' => 'list-style-type: none; padding-left: 0;',
+        'listItem' => 'font-size: 16px; color: #555;',
     ];
-    
-    $selected_colors = $colors[$color_scheme] ?? $colors['blue'];
-    
-    $base_styles = [
-        'container' => 'max-width: 1200px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif;',
-        'header' => 'text-align: center; margin-bottom: 30px;',
-        'name' => 'color: ' . $selected_colors['primary'] . '; font-size: 2.5em; margin-bottom: 10px;',
-        'contact' => 'margin-bottom: 20px;',
-        'section' => 'margin-bottom: 25px;',
-        'heading' => 'color: ' . $selected_colors['primary'] . '; border-bottom: 2px solid ' . $selected_colors['secondary'] . '; padding-bottom: 5px; margin-bottom: 15px;',
-        'subheading' => 'color: ' . $selected_colors['secondary'] . '; margin: 10px 0;',
-        'list' => 'list-style-type: none; padding: 0;',
-        'listItem' => 'margin-bottom: 15px; line-height: 1.6;'
-    ];
-    
-    switch ($template) {
-        case 'modern':
-            // Modern template modifications
-            $base_styles['container'] .= 'background: white; box-shadow: 0 0 10px rgba(0,0,0,0.1);';
-            $base_styles['heading'] .= 'font-weight: 300;';
-            $base_styles['listItem'] .= 'padding-left: 20px; border-left: 3px solid ' . $selected_colors['secondary'] . ';';
-            break;
-            
-        case 'classic':
-            // Classic template modifications
-            $base_styles['container'] .= 'background: #fafafa;';
-            $base_styles['heading'] .= 'font-weight: bold;';
-            $base_styles['listItem'] .= 'border-bottom: 1px solid #eee;';
-            break;
-            
-        case 'minimal':
-            // Minimal template modifications
-            $base_styles['container'] .= 'background: white;';
-            $base_styles['heading'] = 'color: ' . $selected_colors['primary'] . '; margin-bottom: 15px; font-size: 1.5em;';
-            $base_styles['listItem'] .= 'padding: 10px 0;';
-            break;
+
+    // Apply color scheme adjustments
+    if ($color_scheme == 'dark') {
+        $styles['container'] .= ' background-color: #333; color: white;';
+        $styles['name'] .= ' color: #FF6347;';  // Tomato color for the name
+    } else {
+        $styles['container'] .= ' background-color: #fff; color: black;';
     }
-    
-    return $base_styles;
+
+    // Template-specific styles
+    if ($template == 'simple') {
+        // No additional styling needed for the simple template
+    } elseif ($template == 'modern') {
+        $styles['container'] .= ' padding: 20px;';
+        $styles['header'] .= ' border-bottom: 2px solid #ddd;';
+    }
+
+    return $styles;
 }
 
-// Function to export CV as PDF
-function exportAsPDF($user_id) {
-    require_once 'vendor/tecnickcom/tcpdf/tcpdf.php';
-    
-    // Create new PDF document
-    $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
-    
-    // Set document information
-    $pdf->SetCreator(PDF_CREATOR);
-    $pdf->SetAuthor('CV Builder');
-    $pdf->SetTitle('CV');
-    
-    // Remove default header/footer
-    $pdf->setPrintHeader(false);
-    $pdf->setPrintFooter(false);
-    
-    // Add a page
-    $pdf->AddPage();
-    
-    // Get CV content
-    $cv_content = generateCVContent($GLOBALS['conn'], $user_id);
-    
-    // Write HTML content
-    $pdf->writeHTML($cv_content, true, false, true, false, '');
-    
-    // Close and output PDF document
-    $pdf->Output('cv.pdf', 'D');
+// Define the fetchUserData function
+function fetchUserData($conn, $user_id) {
+    // Fetch user data (personal info, education, experience, skills, etc.)
+    $user_sql = "SELECT * FROM users WHERE id = $user_id";
+    $user_result = mysqli_query($conn, $user_sql);
+    $user_data = mysqli_fetch_assoc($user_result);
+
+    $education_sql = "SELECT * FROM education WHERE user_id = $user_id";
+    $education_result = mysqli_query($conn, $education_sql);
+    $education_data = mysqli_fetch_all($education_result, MYSQLI_ASSOC);
+
+    $experience_sql = "SELECT * FROM experience WHERE user_id = $user_id";
+    $experience_result = mysqli_query($conn, $experience_sql);
+    $experience_data = mysqli_fetch_all($experience_result, MYSQLI_ASSOC);
+
+    $skills_sql = "SELECT * FROM skills WHERE user_id = $user_id";
+    $skills_result = mysqli_query($conn, $skills_sql);
+    $skills_data = mysqli_fetch_all($skills_result, MYSQLI_ASSOC);
+
+    $projects_sql = "SELECT * FROM projects WHERE user_id = $user_id";
+    $projects_result = mysqli_query($conn, $projects_sql);
+    $projects_data = mysqli_fetch_all($projects_result, MYSQLI_ASSOC);
+
+    return [
+        'user' => $user_data,
+        'education' => $education_data,
+        'experience' => $experience_data,
+        'skills' => $skills_data,
+        'projects' => $projects_data,
+    ];
 }
 
-// Handle PDF export request
-if (isset($_POST['export_pdf']) && isset($_SESSION['user_id'])) {
-    exportAsPDF($_SESSION['user_id']);
-}
+// Generate CV content dynamically based on user data
+function generateCVContent($conn, $user_id) {
+    $data = fetchUserData($conn, $user_id);
+    $user = $data['user'];
+    $education = $data['education'];
+    $experience = $data['experience'];
+    $skills = $data['skills'];
+    $projects = $data['projects'];
 
-// Close database connection
-mysqli_close($conn);
+    $content = "<div style='padding: 20px;'>";
+    $content .= "<div style='text-align: center;'>";
+    $content .= "<h1 style='font-size: 36px;'>" . $user['name'] . "</h1>";
+    $content .= "<p style='font-size: 16px;'>" . $user['email'] . " | " . $user['phone'] . "</p>";
+    $content .= "<p style='font-size: 16px;'>" . $user['address'] . "</p>";
+    $content .= "</div>";
+
+    // Add Summary Section
+    $content .= "<div style='margin-top: 20px;'><h2 style='font-size: 24px;'>Summary</h2>";
+    $content .= "<p>" . nl2br($user['summary']) . "</p></div>";
+
+    // Add Education Section
+    $content .= "<div style='margin-top: 20px;'><h2 style='font-size: 24px;'>Education</h2><ul>";
+    foreach ($education as $edu) {
+        $content .= "<li style='font-size: 16px;'>" . $edu['degree'] . " in " . $edu['field'] . " from " . $edu['institution'] . " (" . $edu['start_date'] . " - " . $edu['end_date'] . ")";
+        if ($edu['gpa']) {
+            $content .= " - GPA: " . $edu['gpa'];
+        }
+        if ($edu['achievements']) {
+            $content .= " - Achievements: " . $edu['achievements'];
+        }
+        $content .= "</li>";
+    }
+    $content .= "</ul></div>";
+
+    // Add Experience Section
+    $content .= "<div style='margin-top: 20px;'><h2 style='font-size: 24px;'>Experience</h2><ul>";
+    foreach ($experience as $exp) {
+        $content .= "<li style='font-size: 16px;'>" . $exp['position'] . " at " . $exp['company'] . " (" . $exp['start_date'] . " - " . $exp['end_date'] . ")";
+        if ($exp['description']) {
+            $content .= " - " . nl2br($exp['description']);
+        }
+        if ($exp['achievements']) {
+            $content .= " - Achievements: " . nl2br($exp['achievements']);
+        }
+        if ($exp['location']) {
+            $content .= " - Location: " . $exp['location'];
+        }
+        $content .= "</li>";
+    }
+    $content .= "</ul></div>";
+
+    // Add Skills Section
+    $content .= "<div style='margin-top: 20px;'><h2 style='font-size: 24px;'>Skills</h2><ul>";
+    foreach ($skills as $skill) {
+        $content .= "<li style='font-size: 16px;'>" . $skill['skill_name'] . " - " . $skill['proficiency'] . " (" . $skill['years_experience'] . " years)</li>";
+    }
+    $content .= "</ul></div>";
+    // Add Projects Section
+    $content .= "<div style='margin-top: 20px;'><h2 style='font-size: 24px;'>Projects</h2><ul>";
+    foreach ($projects as $proj) {
+        $content .= "<li style='font-size: 16px;'>" . $proj['title'] . " - " . nl2br($proj['description']);
+        if ($proj['technologies']) {
+            $content .= " - Technologies: " . $proj['technologies'];
+        }
+        if ($proj['url']) {
+            $content .= " - URL: <a href='" . $proj['url'] . "'>Project Link</a>";
+        }
+        $content .= "</li>";
+    }
+    $content .= "</ul></div>";
+
+    $content .= "</div>";
+
+    return $content;
+}
 ?>
