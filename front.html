@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate CV</title>
+</head>
+<body>
+
+<h1>Generate Your CV</h1>
+
+<!-- Form to submit data to generate the CV -->
+<form id="save_form" method="POST">
+    <label for="version_name">Enter Version Name:</label>
+    <input type="text" id="version_name" name="version_name" required>
+    <button type="submit" name="save_version">Save Version</button>
+</form>
+
+<!-- Where the generated CV content will be displayed -->
+<div id="cv-output"></div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    // AJAX for handling form submission and displaying the output
+    $('#save_form').submit(function(e) {
+        e.preventDefault(); // Prevent the form from submitting the traditional way
+        $.ajax({
+            url: 'generate_cv.php',  // Path to your PHP script
+            method: 'POST',
+            data: $(this).serialize(),  // Send the form data to the server
+            success: function(response) {
+                // Display the generated CV content inside the 'cv-output' div
+                $('#cv-output').html(response);
+            }
+        });
+    });
+</script>
+
+</body>
+</html>
